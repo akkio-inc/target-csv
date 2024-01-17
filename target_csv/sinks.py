@@ -10,7 +10,7 @@ import pytz
 from singer_sdk import Target
 from singer_sdk.sinks import BatchSink
 
-from target_csv.serialization import write_csv
+from target_csv.serialization import write_csv_header, write_csv_row
 
 
 class CSVSink(BatchSink):
@@ -77,32 +77,11 @@ class CSVSink(BatchSink):
 
         return filepath
 
+    def start_batch(self, context: dict) -> None:
+        write_csv_header(self.output_file, self.schema)
+
+    def process_record(self, record: dict, context: dict) -> None:
+        write_csv_row(self.output_file, record, self.schema)
+
     def process_batch(self, context: dict) -> None:
-        """Write out any prepped records and return once fully written."""
-        output_file: Path = self.output_file
-        self.logger.info(f"Writing to destination file '{output_file.resolve()}'...")
-        new_contents: dict  # noqa: F842
-        create_new = (
-            self.config["overwrite_behavior"] == "replace_file"
-            or not output_file.exists()
-        )
-        if not create_new:
-            raise NotImplementedError("Append mode is not yet supported.")
-
-        if not isinstance(context["records"], list):
-            self.logger.warning(f"No values in {self.stream_name} records collection.")
-            context["records"] = []
-
-        records: List[Dict[str, Any]] = context["records"]
-        if "record_sort_property_name" in self.config:
-            sort_property_name = self.config["record_sort_property_name"]
-            records = sorted(records, key=lambda x: x[sort_property_name])
-
-        self.logger.info(f"Writing {len(context['records'])} records to file...")
-
-        write_csv(
-            output_file,
-            context["records"],
-            self.schema,
-            escapechar=self.config.get("escape_character"),
-        )
+        pass
