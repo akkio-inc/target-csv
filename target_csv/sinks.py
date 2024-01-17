@@ -8,15 +8,16 @@ from typing import Any, Dict, List, Optional
 
 import pytz
 from singer_sdk import Target
-from singer_sdk.sinks import BatchSink
+from singer_sdk.sinks import RecordSink
 
 from target_csv.serialization import write_csv_header, write_csv_row
 
 
-class CSVSink(BatchSink):
+class CSVSink(RecordSink):
     """CSV target sink class."""
 
     max_size = sys.maxsize  # We want all records in one batch
+    wrote_header = False
 
     def __init__(  # noqa: D107
         self,
@@ -77,11 +78,8 @@ class CSVSink(BatchSink):
 
         return filepath
 
-    def start_batch(self, context: dict) -> None:
-        write_csv_header(self.output_file, self.schema)
-
     def process_record(self, record: dict, context: dict) -> None:
+        if not self.wrote_header:
+            self.wrote_header = True
+            write_csv_header(self.output_file, self.schema)
         write_csv_row(self.output_file, record, self.schema)
-
-    def process_batch(self, context: dict) -> None:
-        pass
