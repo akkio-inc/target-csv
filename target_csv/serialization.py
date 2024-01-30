@@ -1,6 +1,6 @@
 import csv  # noqa: D100
 from pathlib import Path
-from typing import List, Any
+from typing import Dict, List, Any
 
 
 def write_csv_header(filepath: Path, schema: dict, **kwargs: Any) -> None:
@@ -23,6 +23,24 @@ def write_csv_row(filepath: Path, record: dict, schema: dict, **kwargs: Any) -> 
     with open(filepath, "a", encoding="utf-8", newline="") as fp:
         writer = csv.DictWriter(fp, fieldnames=keys, dialect="excel", **kwargs)
         writer.writerow(record)
+
+def write_csv_rows(filepath: Path, records: List[dict], schema: dict) -> None:
+    """
+    Writes N rows.
+     We can't use the below function because that also includes the header.
+     This function is a variant that's more useful for appending multiple lines at once, as we do with batch processing.
+     """
+    if "properties" not in schema:
+        raise ValueError("Stream's schema has no properties defined.")
+
+    keys: List[str] = list(schema["properties"].keys())
+    with open(filepath, "a", encoding="utf-8", newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=keys, dialect="excel")
+        # intentionally no header write!
+        for record_count, record in enumerate(records, start=1):
+            writer.writerow(record)
+
+    return record_count
 
 
 def write_csv(filepath: Path, records: List[dict], schema: dict) -> int:
