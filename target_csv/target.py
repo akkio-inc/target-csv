@@ -73,5 +73,13 @@ class TargetCSV(Target):
                 "https://sdk.meltano.com/en/latest/stream_maps.html"
             ),
         ),
+        th.Property(
+            "batch_size",
+            th.IntegerType,
+            description=(
+                "The number of records to queue up before writing to disk. "
+            ),
+            default=10000,
+        )
     ).to_dict()
     default_sink_class = CSVSink

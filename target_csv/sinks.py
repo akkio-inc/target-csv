@@ -7,15 +7,15 @@ from typing import Any, Dict, List, Optional
 
 import pytz
 from singer_sdk import PluginBase
-from singer_sdk.sinks import RecordSink
+from singer_sdk.sinks import BatchSink
 
 from target_csv.serialization import write_csv, write_csv_header, write_csv_row
 
 
-class CSVSink(RecordSink):
+class CSVSink(BatchSink):
     """CSV target sink class."""
 
-    max_size = sys.maxsize  # We want all records in one batch
+    queued_records: List[dict] = []
     wrote_header = False
 
     def __init__(  # noqa: D107
@@ -26,6 +26,7 @@ class CSVSink(RecordSink):
         key_properties: Optional[List[str]],
     ) -> None:
         self._timestamp_time: Optional[datetime.datetime] = None
+        self.batch_size = target.config["batch_size"] # save ourselves a dict lookup every row
         super().__init__(target, stream_name, schema, key_properties)
 
     @property
@@ -58,8 +59,23 @@ class CSVSink(RecordSink):
 
         return Path(result)
 
-    def process_record(self, record: dict, context: dict) -> None:
+    @property
+    def is_full(self) -> bool:
+        return len(self.queued_records) >= self.batch_size
+
+    def _flush_queued_records(self):
+        for record in self.queued_records:
+            write_csv_row(self.destination_path, record, self.schema)
+        self.queued_records.clear()
+
+    def start_batch(self, context: dict) -> None:
+        # Possible to get multiple batches, so be sure we don't create a new file & header each time
         if not self.wrote_header:
             write_csv_header(self.destination_path, self.schema)
             self.wrote_header = True
-        write_csv_row(self.destination_path, record, self.schema)
+
+    def process_record(self, record: dict, context: dict) -> None:
+        self.queued_records.append(record)
+
+    def process_batch(self, context: dict) -> None:
+        self._flush_queued_records()
