@@ -1,22 +1,25 @@
 """CSV target sink class, which handles writing streams."""
 
 import datetime
-import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import pytz
 from singer_sdk import PluginBase
-from singer_sdk.sinks import RecordSink
+from singer_sdk.sinks import BatchSink
 
-from target_csv.serialization import write_csv, write_csv_header, write_csv_row
+from target_csv.serialization import write_csv, write_csv_header, write_csv_rows
 
 
-class CSVSink(RecordSink):
+class CSVSink(BatchSink):
     """CSV target sink class."""
 
-    max_size = sys.maxsize  # We want all records in one batch
-    wrote_header = False
+    @property
+    def max_size(self) -> int:
+        # base sink attribute that determines max batch size
+        return 1_000
+
+    _wrote_header: bool = False
 
     def __init__(  # noqa: D107
         self,
@@ -58,8 +61,15 @@ class CSVSink(RecordSink):
 
         return Path(result)
 
-    def process_record(self, record: dict, context: dict) -> None:
-        if not self.wrote_header:
+    def start_batch(self, context: dict) -> None:
+        # Possible to get multiple batches, so be sure we don't create a new file & header each time
+        self.logger.info("Processing start_batch()")
+        if not self._wrote_header:
+            self.logger.info("Writing header.")
             write_csv_header(self.destination_path, self.schema)
-            self.wrote_header = True
-        write_csv_row(self.destination_path, record, self.schema)
+            self._wrote_header = True
+
+    def process_batch(self, context: dict) -> None:
+        records = context["records"]
+        self.logger.info(f"Processing batch. Has {len(records)} records.")
+        write_csv_rows(self.destination_path, records, self.schema)

@@ -20,6 +20,11 @@ target-csv = 'target_csv.target:TargetCSV.cli'
 requires = ["poetry-core>=1.0.7"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.pytest.ini_options]
+addopts = [
+    "--disable-warnings", # Disable at some point in the future
+]
+
 [tool.ruff]
 target-version = "py37"
 line-length = 88
